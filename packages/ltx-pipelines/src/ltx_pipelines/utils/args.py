@@ -181,6 +181,24 @@ def basic_arg_parser() -> argparse.ArgumentParser:
         "Note that calculations are still performed in bfloat16 precision.",
     )
     parser.add_argument("--enhance-prompt", action="store_true")
+    parser.add_argument(
+        "--mac-optimize",
+        action="store_true",
+        help=(
+            "Enable Apple Silicon runtime optimizations (MPS fallback, matmul tuning) and disable unsupported FP8 mode "
+            "automatically."
+        ),
+    )
+    parser.add_argument(
+        "--mac-profile",
+        type=str,
+        choices=("none", "fast", "quality"),
+        default="none",
+        help=(
+            "Apple Silicon preset for generation parameters. "
+            "'fast' favors speed, 'quality' favors output quality at higher runtime cost."
+        ),
+    )
     return parser
 
 
@@ -251,7 +269,7 @@ def default_1_stage_arg_parser() -> argparse.ArgumentParser:
         default=DEFAULT_VIDEO_GUIDER_PARAMS.skip_step,
         help=(
             "Video skip step N controls periodic skipping during the video diffusion process: "
-            "only steps where step_index % (N + 1) == 0 are processed, all others are skipped "
+            "only steps where step_index %% (N + 1) == 0 are processed, all others are skipped "
             f"(e.g., 0 = no skipping; 1 = skip every other step; 2 = skip 2 of every 3 steps; "
             f"default: {DEFAULT_VIDEO_GUIDER_PARAMS.skip_step})."
         ),
@@ -311,7 +329,7 @@ def default_1_stage_arg_parser() -> argparse.ArgumentParser:
         default=DEFAULT_AUDIO_GUIDER_PARAMS.skip_step,
         help=(
             "Audio skip step N controls periodic skipping during the audio diffusion process: "
-            "only steps where step_index % (N + 1) == 0 are processed, all others are skipped "
+            "only steps where step_index %% (N + 1) == 0 are processed, all others are skipped "
             f"(e.g., 0 = no skipping; 1 = skip every other step; 2 = skip 2 of every 3 steps; "
             f"default: {DEFAULT_AUDIO_GUIDER_PARAMS.skip_step})."
         ),

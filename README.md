@@ -77,6 +77,55 @@ Download the following models from the [LTX-2 HuggingFace repository](https://hu
 * **Skip memory cleanup** - If you have sufficient VRAM, disable automatic memory cleanup between stages for faster processing
 * **Choose single-stage pipeline** - Use `TI2VidOneStagePipeline` for faster generation when high resolution isn't required
 
+### Apple Silicon (Mac) Runtime
+
+Use built-in Mac optimization flags on pipeline CLIs:
+
+```bash
+python -m ltx_pipelines.distilled \
+  ... \
+  --mac-optimize \
+  --mac-profile fast
+```
+
+- `--mac-optimize`: enables Apple Silicon runtime tuning and disables unsupported FP8 mode automatically.
+- `--mac-profile fast|quality`: applies tuned generation defaults for speed or quality.
+- FP8 checkpoints are not supported on MPS. Use non-FP8 checkpoints on Mac.
+
+You can also use the helper script:
+
+```bash
+./scripts/run_mac_distilled.sh fast "A cinematic shot of ocean waves at sunset"
+```
+
+Or use the dedicated mac-native launcher (auto-selects a non-FP8 checkpoint and creates timestamped output folders):
+
+```bash
+python -m ltx_pipelines.mac_native \
+  --profile fast \
+  --prompt "A cinematic shot of ocean waves at sunset"
+```
+
+Shell shortcut:
+
+```bash
+./scripts/run_mac_native.sh fast "A cinematic shot of ocean waves at sunset"
+```
+
+One-stage mac-native launcher (faster previews):
+
+```bash
+python -m ltx_pipelines.mac_native_one_stage \
+  --profile fast \
+  --prompt "A cinematic shot of ocean waves at sunset"
+```
+
+Shell shortcut:
+
+```bash
+./scripts/run_mac_native_one_stage.sh fast "A cinematic shot of ocean waves at sunset"
+```
+
 ## ✍️ Prompting for LTX-2
 
 When writing prompts, focus on detailed, chronological descriptions of actions and scenes. Include specific movements, appearances, camera angles, and environmental details - all in a single flowing paragraph. Start directly with the action, and keep descriptions literal and precise. Think like a cinematographer describing a shot list. Keep within 200 words. For best results, build your prompts using this structure:

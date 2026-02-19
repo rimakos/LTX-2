@@ -1,6 +1,9 @@
 import gc
 import logging
+import os
+import platform
 from dataclasses import replace
+from pathlib import Path
 
 import torch
 from tqdm import tqdm
@@ -32,17 +35,77 @@ from ltx_pipelines.utils.types import (
     PipelineComponents,
 )
 
+MAC_PROFILE_VALUES = {
+    False: {  # one-stage pipelines
+        "fast": {"height": 384, "width": 640, "num_frames": 9, "frame_rate": 8.0, "num_inference_steps": 16},
+        "quality": {"height": 512, "width": 768, "num_frames": 17, "frame_rate": 12.0, "num_inference_steps": 24},
+    },
+    True: {  # two-stage pipelines
+        "fast": {"height": 512, "width": 768, "num_frames": 9, "frame_rate": 8.0, "num_inference_steps": 16},
+        "quality": {"height": 768, "width": 1152, "num_frames": 17, "frame_rate": 12.0, "num_inference_steps": 24},
+    },
+}
+
 
 def get_device() -> torch.device:
     if torch.cuda.is_available():
         return torch.device("cuda")
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
     return torch.device("cpu")
+
+
+def synchronize_device() -> None:
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+    elif torch.backends.mps.is_available() and hasattr(torch, "mps") and hasattr(torch.mps, "synchronize"):
+        torch.mps.synchronize()
 
 
 def cleanup_memory() -> None:
     gc.collect()
-    torch.cuda.empty_cache()
-    torch.cuda.synchronize()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    synchronize_device()
+
+
+def is_apple_silicon() -> bool:
+    return platform.system() == "Darwin" and platform.machine() == "arm64"
+
+
+def configure_mac_runtime(args: object, is_two_stage: bool) -> None:
+    if not is_apple_silicon():
+        return
+
+    if getattr(args, "mac_optimize", False):
+        os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+        if hasattr(torch, "set_float32_matmul_precision"):
+            torch.set_float32_matmul_precision("high")
+        if getattr(args, "enable_fp8", False):
+            logging.warning("FP8 is not supported on Apple MPS. Disabling --enable-fp8 automatically.")
+            args.enable_fp8 = False
+
+    profile = getattr(args, "mac_profile", "none")
+    if profile in ("fast", "quality"):
+        profile_values = get_mac_profile_values(profile=profile, is_two_stage=is_two_stage)
+        for key, value in profile_values.items():
+            if hasattr(args, key):
+                setattr(args, key, value)
+        logging.info(f"Applied mac profile '{profile}': {profile_values}")
+
+    checkpoint_path = getattr(args, "checkpoint_path", "")
+    if checkpoint_path and "fp8" in Path(checkpoint_path).name.lower():
+        msg = (
+            "FP8 checkpoints are not compatible with Apple MPS. "
+            "Use a non-FP8 checkpoint such as ltx-2-19b-distilled.safetensors or ltx-2-19b-dev.safetensors."
+        )
+        raise ValueError(msg)
+
+
+def get_mac_profile_values(profile: str, is_two_stage: bool) -> dict[str, int | float]:
+    if profile not in ("fast", "quality"):
+        raise ValueError(f"Invalid mac profile '{profile}'. Use one of: fast, quality")
+    return MAC_PROFILE_VALUES[is_two_stage][profile].copy()
 
 
 def image_conditionings_by_replacing_latent(

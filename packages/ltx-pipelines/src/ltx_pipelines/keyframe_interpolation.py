@@ -24,6 +24,7 @@ from ltx_pipelines.utils.constants import (
 from ltx_pipelines.utils.helpers import (
     assert_resolution,
     cleanup_memory,
+    configure_mac_runtime,
     denoise_audio_video,
     euler_denoising_loop,
     generate_enhanced_prompt,
@@ -31,6 +32,7 @@ from ltx_pipelines.utils.helpers import (
     image_conditionings_by_adding_guiding_latent,
     multi_modal_guider_denoising_func,
     simple_denoising_func,
+    synchronize_device,
 )
 from ltx_pipelines.utils.media_io import encode_video
 from ltx_pipelines.utils.types import PipelineComponents
@@ -108,7 +110,7 @@ class KeyframeInterpolationPipeline:
         v_context_p, a_context_p = context_p
         v_context_n, a_context_n = context_n
 
-        torch.cuda.synchronize()
+        synchronize_device()
         del text_encoder
         cleanup_memory()
 
@@ -167,7 +169,7 @@ class KeyframeInterpolationPipeline:
             device=self.device,
         )
 
-        torch.cuda.synchronize()
+        synchronize_device()
         del transformer
         cleanup_memory()
 
@@ -178,7 +180,7 @@ class KeyframeInterpolationPipeline:
             upsampler=self.stage_2_model_ledger.spatial_upsampler(),
         )
 
-        torch.cuda.synchronize()
+        synchronize_device()
         cleanup_memory()
 
         transformer = self.stage_2_model_ledger.transformer()
@@ -223,7 +225,7 @@ class KeyframeInterpolationPipeline:
             initial_audio_latent=audio_state.latent,
         )
 
-        torch.cuda.synchronize()
+        synchronize_device()
         del transformer
         del video_encoder
         cleanup_memory()
@@ -242,6 +244,7 @@ def main() -> None:
     logging.getLogger().setLevel(logging.INFO)
     parser = default_2_stage_arg_parser()
     args = parser.parse_args()
+    configure_mac_runtime(args, is_two_stage=True)
     pipeline = KeyframeInterpolationPipeline(
         checkpoint_path=args.checkpoint_path,
         distilled_lora=args.distilled_lora,

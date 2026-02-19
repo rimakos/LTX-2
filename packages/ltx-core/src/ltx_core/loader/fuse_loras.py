@@ -1,13 +1,19 @@
 import torch
-import triton
+try:
+    import triton
+except ModuleNotFoundError:  # pragma: no cover - optional dependency on non-CUDA setups
+    triton = None
 
-from ltx_core.loader.kernels import fused_add_round_kernel
 from ltx_core.loader.primitives import LoraStateDictWithStrength, StateDict
 
 BLOCK_SIZE = 1024
 
 
 def fused_add_round_launch(target_weight: torch.Tensor, original_weight: torch.Tensor, seed: int) -> torch.Tensor:
+    if triton is None:
+        raise RuntimeError("Triton is required for CUDA float8 LoRA fusion but is not installed.")
+    from ltx_core.loader.kernels import fused_add_round_kernel
+
     if original_weight.dtype == torch.float8_e4m3fn:
         exponent_bits, mantissa_bits, exponent_bias = 4, 3, 7
     elif original_weight.dtype == torch.float8_e5m2:

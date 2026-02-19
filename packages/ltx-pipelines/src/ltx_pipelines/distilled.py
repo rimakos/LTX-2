@@ -23,12 +23,14 @@ from ltx_pipelines.utils.constants import (
 from ltx_pipelines.utils.helpers import (
     assert_resolution,
     cleanup_memory,
+    configure_mac_runtime,
     denoise_audio_video,
     euler_denoising_loop,
     generate_enhanced_prompt,
     get_device,
     image_conditionings_by_replacing_latent,
     simple_denoising_func,
+    synchronize_device,
 )
 from ltx_pipelines.utils.media_io import encode_video
 from ltx_pipelines.utils.types import PipelineComponents
@@ -95,7 +97,7 @@ class DistilledPipeline:
         context_p = encode_text(text_encoder, prompts=[prompt])[0]
         video_context, audio_context = context_p
 
-        torch.cuda.synchronize()
+        synchronize_device()
         del text_encoder
         cleanup_memory()
 
@@ -152,7 +154,7 @@ class DistilledPipeline:
             latent=video_state.latent[:1], video_encoder=video_encoder, upsampler=self.model_ledger.spatial_upsampler()
         )
 
-        torch.cuda.synchronize()
+        synchronize_device()
         cleanup_memory()
 
         stage_2_sigmas = torch.Tensor(STAGE_2_DISTILLED_SIGMA_VALUES).to(self.device)
@@ -180,7 +182,7 @@ class DistilledPipeline:
             initial_audio_latent=audio_state.latent,
         )
 
-        torch.cuda.synchronize()
+        synchronize_device()
         del transformer
         del video_encoder
         cleanup_memory()
@@ -199,6 +201,7 @@ def main() -> None:
     logging.getLogger().setLevel(logging.INFO)
     parser = default_2_stage_distilled_arg_parser()
     args = parser.parse_args()
+    configure_mac_runtime(args, is_two_stage=True)
     pipeline = DistilledPipeline(
         checkpoint_path=args.checkpoint_path,
         spatial_upsampler_path=args.spatial_upsampler_path,

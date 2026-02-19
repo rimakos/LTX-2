@@ -187,7 +187,7 @@ class ModelLedger:
             raise ValueError(
                 "Transformer not initialized. Please provide a checkpoint path to the ModelLedger constructor."
             )
-        if self.fp8transformer:
+        if self.fp8transformer and self.device.type == "cuda":
             fp8_builder = replace(
                 self.transformer_builder,
                 module_ops=(UPCAST_DURING_INFERENCE,),
